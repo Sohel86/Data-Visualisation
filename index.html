@@ -2,12 +2,245 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Web Page</title>
-             
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://d3js.org/d3.v6.min.js" charset="utf-8"></script>
+    <script src="https://d3js.org/topojson.v3.min.js" charset="utf-8"></script>
+    <title>MA Map</title>
+    <style>
+        #tooltip {
+            position: absolute;
+            opacity: 0;
+            top: 0;
+            left: 0;
+            width: auto;
+            height: auto;
+            padding: 10px;
+            background: white;
+            font-family: sans-serif;
+            font-size: medium;
+            border-radius: 2px;
+            line-height: 1;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .map {
+            width: 80%; /* Adjust the width as needed */
+            height: auto;
+            max-height: 70vh; /* Adjust the maximum height as needed */
+        }
+    </style>
 </head>
-</body>
+<body>
+    <div id="tooltip"></div>
+    <div class="container">
+        <h1>Major Assignment 2</h1>
+        <h3>Sohel Shaikh</h3>
+        <div class="fig1 map"></div>
+        <div class="fig2 map"></div>
+        <div class="fig3 map"></div>
+    </div>
 
-      <H1>Hello Word!</H1>
+    <script>
+        const svgWidth = 900; // Adjust the width as needed
+        const svgHeight = 500; // Adjust the height as needed
 
+        // a topojson file containing population of each town in different years
+        const MA_counties = "towns.topojson";
+        // gini index per county
+        const gini_index = "gini_index.csv";
+
+        Promise.all([
+            d3.json(MA_counties),
+            d3.csv(gini_index)
+        ]).then(data => {
+            // topology data
+            const topology_data = data[0];
+			console.log("topology_data:",topology_data)
+            // gini index data
+            const csv_data = data[1];
+			
+            const generateMap1 = (topo_data, containerName, width, height, margin = 30) => {
+                const svg = d3.select(containerName).append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                // Topojson data handling
+                const geojson = topojson.feature(topo_data, topo_data.objects.ma);
+				
+                // Projections
+                const projection = d3.geoMercator()
+                    .fitSize([width - margin, height - margin], geojson);
+
+                // GeoPath generator
+                const geoPath_generator = d3.geoPath().projection(projection);
+
+                // Color Scaling
+                const colorInterpolator = d3.interpolateRgbBasis(['#d73027','#fc8d59','#fee090','#e0f3f8','#91bfdb','#4575b4'].reverse());
+                const logScale = d3.scaleLog()
+                    .domain(d3.extent(geojson.features, (d) => d.properties.POP1980));
+                const linearScale = d3.scaleLinear()
+                    .domain(d3.extent(geojson.features, (d) => d.properties.POP1980));
+
+                // Tooltip
+                const tooltip = d3.select("#tooltip");
+
+                // Channelling marks
+                svg.selectAll("path")
+                    .data(geojson.features)
+                    .enter()
+                    .append("path")
+                    .attr("d", d => geoPath_generator(d))
+                    .attr("fill", d => colorInterpolator(linearScale(d.properties.POP1980)))
+                    .on("mouseenter", (m, d) => {
+                        tooltip.transition()
+                            .duration(200)
+                            .style("opacity", 0.9);
+                        tooltip.html(`Town: ${d.properties.TOWN}<br>Pop1980: ${d.properties.POP1980}`)
+                            .style("left", m.clientX + "px")
+                            .style("top", m.clientY + "px");
+						d3.select(event.target)
+							.attr("stroke", "black")
+							.attr("stroke-width", 2);
+                    })
+                    .on("mousemove", (m, d) => {
+                        tooltip.style("opacity", 0.9);
+                    })
+                    .on("mouseout", (m, d) => {
+                        tooltip.transition()
+                            .duration(400)
+                            .style("opacity", 0);
+						d3.select(event.target)
+							.attr("stroke", null);
+                    });
+            }
+
+            generateMap1(topology_data, ".fig1", svgWidth, svgHeight);
+
+            const generateMap2 = (topo_data, containerName, width, height, margin = 10) => {
+                const svg = d3.select(containerName).append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                // Topojson data handling
+                const geojson = topojson.feature(topo_data, topo_data.objects.ma);
+
+                // Projections
+                const projection = d3.geoMercator()
+                    .fitSize([width - margin, height - margin], geojson);
+
+                // GeoPath generator
+                const geoPath_generator = d3.geoPath().projection(projection);
+
+                // Color Scaling
+                const colorInterpolator = d3.interpolateRgbBasis(["purple", "orange"].reverse());
+                const logScale = d3.scaleLog()
+                    .domain(d3.extent(geojson.features, (d) => d.properties.POP2010 - d.properties.POP2000));
+                const linearScale = d3.scaleLinear()
+                    .domain(d3.extent(geojson.features, (d) => d.properties.POP2010 - d.properties.POP2000));
+
+                // Tooltip
+                const tooltip = d3.select("#tooltip");
+
+                // Channelling marks
+                svg.selectAll("path")
+                    .data(geojson.features)
+                    .enter()
+                    .append("path")
+                    .attr("d", d => geoPath_generator(d))
+                    .attr("fill", d => colorInterpolator(linearScale(d.properties.POP2010 - d.properties.POP2000)))
+                    .on("mouseenter", (m, d) => {
+                        tooltip.transition()
+                            .duration(200)
+                            .style("opacity", 0.9);
+                        tooltip.html(`Town: ${d.properties.TOWN}<br>Population Change (2010-2000): ${d.properties.POP2010 - d.properties.POP2000}`)
+                            .style("left", m.clientX  + "px")
+                            .style("top", (m.clientY + 350)  + "px");
+						d3.select(event.target)
+							.attr("stroke", "black")
+							.attr("stroke-width", 2);
+                    })
+                    .on("mousemove", (m, d) => {
+                        tooltip.style("opacity", 0.9);
+                    })
+                    .on("mouseout", (m, d) => {
+                        tooltip.transition()
+                            .duration(400)
+                            .style("opacity", 0);
+						d3.select(event.target)
+							.attr("stroke", null);
+                    });
+            }
+
+            generateMap2(topology_data, ".fig2", svgWidth, svgHeight);
+			
+			
+			const generateMap3 = (topo_data, containerName, width, height, margin = 30) => {
+                const svg = d3.select(containerName).append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                // Topojson data handling
+                const geojson = topojson.feature(topo_data, topo_data.objects.ma);
+				
+                // Projections
+                const projection = d3.geoMercator()
+                    .fitSize([width - margin, height - margin], geojson);
+
+                // GeoPath generator
+                const geoPath_generator = d3.geoPath().projection(projection);
+
+                // Color Scaling
+                const colorInterpolator = d3.interpolateRgbBasis(['#d73027','#fc8d59','#fee090','#e0f3f8','#91bfdb','#4575b4'].reverse());
+                const logScale = d3.scaleLog()
+                    .domain(d3.extent(geojson.features, (d) => d.properties.FIPS_STCO));
+                const linearScale = d3.scaleLinear()
+                    .domain(d3.extent(geojson.features, (d) => d.properties.FIPS_STCO));
+
+                // Tooltip
+                const tooltip = d3.select("#tooltip");
+
+                // Channelling marks
+                svg.selectAll("path")
+                    .data(geojson.features)
+                    .enter()
+                    .append("path")
+                    .attr("d", d => geoPath_generator(d))
+                    .attr("fill", d => colorInterpolator(linearScale(d.properties.FIPS_STCO)))
+                    .on("mouseenter", (m, d) => {
+                        tooltip.transition()
+                            .duration(200)
+                            .style("opacity", 0.9);
+                        tooltip.html(`County: ${d.properties.FIPS_STCO}`)
+                            .style("left", m.clientX + "px")
+                            .style("top", (m.clientY + 900) + "px");
+						d3.select(event.target)
+							.attr("stroke", "black")
+							.attr("stroke-width", 2);
+                    })
+                    .on("mousemove", (m, d) => {
+                        tooltip.style("opacity", 0.9);
+                    })
+                    .on("mouseout", (m, d) => {
+                        tooltip.transition()
+                            .duration(400)
+                            .style("opacity", 0);
+						d3.select(event.target)
+							.attr("stroke", null);
+                    });
+            }
+
+            generateMap3(topology_data, ".fig3", svgWidth, svgHeight);
+
+           
+        });
+    </script>
 </body>
 </html>
+
